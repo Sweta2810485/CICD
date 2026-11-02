@@ -1,8 +1,11 @@
+
 name: Model Training CICD
 
 permissions:
-  id-token: write
-  contents: write
+  contents: read
+  issues: write
+  pull-requests: write
+
 on:
   push:
 
@@ -11,37 +14,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          node-version: '20'
+          python-version: '3.11'
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libcairo2-dev \
-            libjpeg-dev \
-            libpango1.0-dev \
-            libgif-dev \
-            librsvg2-dev
-
-      - uses: iterative/setup-cml@v2
+      - name: Install CML
+        uses: iterative/setup-cml@v2
 
       - name: Train model
         env:
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pip install -r requirements.txt
+
           python train_model.py
 
-          echo "RF and LR Model Score" > report.md
+      - name: Generate CML Report
+        env:
+          REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "# Machine Learning Model Report" > report.md
+
+          echo "## Model Scores" >> report.md
           cat scores.txt >> report.md
 
-          echo "Confusion Matrix & Feature Importance" > report1.md
-          echo '|[](./ConfusionMatrix.png "ConfusionMatrix")' >> report1.md
-          echo '|[](./FeatureImportance.png "FeatureImportance")' >> report1.md
+          echo "" >> report.md
+          echo "## Generated Files" >> report.md
+          echo "- ConfusionMatrix.png" >> report.md
+          echo "- ConfusionMatrix_RF.png" >> report.md
+          echo "- FeatureImportance.png" >> report.md
 
-          cat report.md report1.md > combined_file.md
-          cml comment create combined_file.md
+          cml comment create --publish=false report.md
